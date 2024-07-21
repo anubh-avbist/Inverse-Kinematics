@@ -46,7 +46,7 @@ class Leg{
 		this.legSize = segmentLength;
 		this.jointPos = [1,1];
 		this.footPos = [0,0];
-		this.prevAngle = 0;
+		this.prevAngle = [0,0]; // [0] is root, [1] is joint;
 	}
 
 	debugStuff(){
@@ -86,14 +86,33 @@ class Leg{
 		if(dist <= this.legSize*2){ // If in range
 			let theta = Math.PI-Math.acos((dist*dist-2*(this.legSize*this.legSize))/(2*this.legSize*this.legSize));
 			let phi = (Math.PI-theta)/2;
-			this.rootAngle=lerp(this.rootAngle,refAngle+phi,0.5  );
-			this.jointAngle=lerp(this.jointAngle,this.rootAngle-Math.PI+theta,0.5);
+
+
+			
+			this.rootAngle=lerp(this.rootAngle,refAngle+phi,1);
+			this.jointAngle=lerp(this.jointAngle,this.rootAngle-Math.PI+theta,1);
+			
+			if(Math.abs(this.rootAngle-this.prevAngle[0])>Math.PI/2*0.9 || this.jointAngle-this.prevAngle[1] > Math.PI/2*0.9){
+				this.rootAngle = refAngle+phi;
+				this.jointAngle = this.rootAngle-Math.PI+theta;
+			}
+			  
+			
 			this.footPos = lerp(this.footPos,this.destination,0.5);
-			//this.jointAngle=this.rootAngle-theta;
+			
 		} else { // If out out range, straigthen out the leg.
+
+			//console.log(Math.abs(this.rootAngle-refAngle));
+			if(Math.abs(this.rootAngle-refAngle)>1){
+				this.rootAngle = refAngle;
+				this.jointAngle = refAngle;
+			}
 			this.rootAngle = lerp(this.rootAngle,refAngle,0.5);
 			this.jointAngle = lerp(this.jointAngle ,refAngle,0.5);
 		}
+
+		this.prevAngle = [this.rootAngle,this.jointAngle];
+
 
 	}
 }
