@@ -1,8 +1,11 @@
 const segmentLength = 50;
-const numlegs = 15;
+const numlegs = 3;
+const fps = 30;
+let floorLevel = 400;
 let creature;
+let time = 0;
  
-
+ 
 
 // Math
 
@@ -49,6 +52,11 @@ class Leg{
 		this.footPos = [0,0];
 		this.prevAngle = [0,0]; // [0] is root, [1] is joint;
 		this.time = 0;
+		this.anchored = false;
+		this.newDestination = [0,0];
+		this.orientation = 0;
+		this.transitioning = false;
+		this.stepHeight = 5;
 	}
 
 	debugStuff(){
@@ -59,12 +67,27 @@ class Leg{
 		//ellipse(this.jointPos[0],this.jointPos[1],10,10);
 		fill(255,0,255);
 		//ellipse(this.footPos[0],this.footPos[1],10,10);
-		let x = this.time;
+		strokeWeight(5);
+	}
+
+	transition(){
+		let transTime = 0.4;
+		this.time += 1/fps;	
+		
+		if(this.time < transTime){
+			
+			this.destination[0] = lerp(this.destination[0],this.newDestination[0], this.time/transTime);
+			this.destination[1] = floorLevel-Math.sin(this.time/transTime*Math.PI)*this.stepHeight;
+		} else {
+			
+			this.transitioning = false;
+		}
+
 	}
 
 
 	IK(){
-		this.time+=0.1;
+		
 		this.jointPos = [
 			this.root[0] + this.legSize*Math.cos(this.rootAngle), 
 			this.root[1] + this.legSize*Math.sin(this.rootAngle)
@@ -88,25 +111,49 @@ class Leg{
 		if(this.destination[1]<this.root[1] ){
 			refAngle*=-1;
 		}
+
+
 		if(dist <= this.legSize*2){ // If in range
+			
+			if(!this.anchored){ // randomize counter vs clock wise
+				this.orientation = Math.round(Math.random());
+			}
+			this.anchored = true;
 			let theta = Math.PI-Math.acos((dist*dist-2*(this.legSize*this.legSize))/(2*this.legSize*this.legSize));
 			let phi = (Math.PI-theta)/2;
 
 
 			
-			this.rootAngle=lerp(this.rootAngle,refAngle+phi,1);
-			this.jointAngle=lerp(this.jointAngle,this.rootAngle-Math.PI+theta,1);
+			this.rootAngle=lerp(this.rootAngle,refAngle-phi,1);
+			this.jointAngle=lerp(this.jointAngle,this.rootAngle+Math.PI-theta,1);
+
+			// Randomise clockwise vs counter
 			
-			if(Math.abs(this.rootAngle-this.prevAngle[0])>Math.PI/2*0.9 || this.jointAngle-this.prevAngle[1] > Math.PI/2*0.9){
-				this.rootAngle = refAngle+phi;
-				this.jointAngle = this.rootAngle-Math.PI+theta;
-			}
-			  
-			
+				
+			let firstSol = [refAngle-phi, refAngle-phi+Math.PI-theta];
+			let secondSol = [refAngle+phi, refAngle+phi-Math.PI+theta];
+			let solutions = [firstSol,secondSol];
+
+			this.rootAngle = solutions[this.orientation][0];
+			this.jointAngle = solutions[this.orientation][1];
+
+				
+			   
+			 
 			this.footPos = lerp(this.footPos,this.destination,0.5);
 			
 		} else { // If out out range, straigthen out the leg.
+			if(this.anchored || dist > this.legSize*3){ // Transition Anchor
 
+				// Set Up Transitioning
+				this.transitioning = true;
+				this.stepHeight = Math.random()*10+5;
+				this.newDestination[0] = this.root[0]+(this.root[0]-this.destination[0])*Math.random()*0.8;
+				this.time = 0;
+			}
+
+			
+			this.anchored = false; 
 			//console.log(Math.abs(this.rootAngle-refAngle));
 			if(Math.abs(this.rootAngle-refAngle)>1){
 				this.rootAngle = refAngle;
@@ -116,10 +163,12 @@ class Leg{
 			this.jointAngle = lerp(this.jointAngle ,refAngle,0.5);
 		}
 
-
+		
+		if(this.transitioning){
+			
+			this.transition();
+		}
 		this.prevAngle = [this.rootAngle,this.jointAngle];
-
-
 	}
 }
 
@@ -130,7 +179,7 @@ class Body{
 		this.y = 0;
 		this.legs = [];
 		for(let i = 0; i < numLegs; i++){
-			this.legs.push(new Leg([this.x,this.y], [175+Math.random()*150,175+Math.random()*150]));  
+			this.legs.push(new Leg([this.x,this.y], [Math.random()*500,floorLevel]));
 		
 			//this.legs.push(new Leg([this.x,this.y], [Math.random()*500,Math.random()*500]));  
 		}
@@ -142,18 +191,28 @@ function findEnds(root, angle, length){
 }
              
 function setup(){
+	frameRate(fps);
 	createCanvas(500,500);
 	creature = new Body(numlegs);
 	
 }
 
 function draw(){
-
+	time+=1/fps;
 
 
 	background(51);
 	creature.x=lerp(creature.x,mouseX, 0.5);
 	creature.y=lerp(creature.y,mouseY,0.5);
+
+	// Draw floor
+	fill(255);
+	noStroke();
+	rect(0,floorLevel,500,500);
+	noFill();
+	
+	strokeWeight(5);
+	stroke(50,100,100);
 
 	// Body
 	ellipse(creature.x,creature.y,50,50);
@@ -167,9 +226,6 @@ function draw(){
 		
 		leg.IK();
 		//leg.debugStuff();
-		strokeWeight(5);
-		stroke(5);
-		fill(5);
 
 		// Drawing 2 straight lines to anchors
 		/*line(creature.x,creature.y, findEnds(leg.root,leg.rootAngle,segmentLength)[0],findEnds(leg.root,leg.rootAngle,segmentLength)[1]);
@@ -181,7 +237,6 @@ function draw(){
 			findEnds(findEnds(leg.root,leg.rootAngle,segmentLength), leg.jointAngle, segmentLength)[1]
 		);*/
 
-		stroke(50,100,100);
 		beginShape();
 		noFill();
 		vertex(creature.x,creature.y);
@@ -196,6 +251,8 @@ function draw(){
 		endShape();
 
 	}
+
+
 
 }
 
