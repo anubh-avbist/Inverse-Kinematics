@@ -1,5 +1,5 @@
 const segmentLength = 50;
-const numlegs = 4	;
+const numlegs = 3;
 const fps = 30;
 let floorLevel = 400;
 let creature;
@@ -20,11 +20,7 @@ function getAngle(a,b){
 		return 0;
 	}
 	return Math.acos((a[0]*b[0] + a[1]*b[1])/(getMagnitude(a)*getMagnitude(b)));
-}
-
-function getTerminalAngle(a){
-	let angle = getAngle(a,[1,0]);
-}
+} 
 
 function addVector2(a,b){
 	return [a[0]+b[0], a[1]+b[1]];
@@ -33,6 +29,18 @@ function addVector2(a,b){
 
 function subVector2(a,b){
 	return [a[0]-b[0], a[1]-b[1]];
+}
+
+function scalarMultiply(scalar, v){
+	return [v[0]*scalar,v[1]*scalar];
+}
+
+function bezierInterpolation(start, end, root, t){
+	 
+	let x = Math.pow((1-t),2)*start[0] + 2*(1-t)*t*root[0]+t*t*end[0];
+	let y = Math.pow((1-t),2)*start[1] + 2*(1-t)*t*root[1]+t*t*end[1];
+	return[x,y];
+
 }
 
 
@@ -44,7 +52,7 @@ class Leg{
 		this.root = root;
 		this.rootAngle = Math.PI/2;
 		this.jointAngle = 0;
-		this.destination =dest;
+		this.destination = dest;
 		this.legSize = segmentLength; //-5+Math.random()*10;
 		this.jointPos = [1,1];
 		this.footPos = [0,0];
@@ -56,6 +64,7 @@ class Leg{
 		this.transitioning = false;
 		this.stepHeight = 5;
 		this.transTime = 0.4;
+		this.startDestination = [0,0];
 	}
 
 	debugStuff(){
@@ -74,11 +83,22 @@ class Leg{
 		
 		if(this.time < this.transTime){
 			
-			this.destination[0] = lerp(this.destination[0],this.newDestination[0], this.time/this.transTime);
+			let t = this.time/this.transTime;
+			t = Math.sin(Math.PI/2*t);
+			
+			
+			this.destination = bezierInterpolation(this.startDestination,this.newDestination,this.root,this.time/this.transTime);
+
+			// Workable method (ish)
+			/*this.destination[0] = lerp(this.destination[0],this.newDestination[0], this.time/this.transTime);
 			let verticalOrientation = (floorLevel-this.root[1])/Math.abs(this.root[1]-floorLevel);
 			this.destination[1] = this.newDestination[1]-verticalOrientation*Math.sin(this.time/this.transTime*Math.PI)*this.stepHeight;
+			*/
+			// Slerp
+
+			// this.destination = slerp(this.preTransDestination,this.newDestination,this.root,this.time/this.transTime);
+		
 		} else {
-			
 			this.transitioning = false;
 		}
 
@@ -138,8 +158,10 @@ class Leg{
 				// Set Up Transitioning
 				this.transitioning = true;
 				this.stepHeight = Math.random()*15+10;
+				this.startDestination[0] = this.destination[0];
 				this.newDestination[0] = this.root[0]+(this.root[0]-this.destination[0])*Math.random()*0.8;
 				this.newDestination[1] = floorLevel;
+				this.startDestination = this.destination;
 				this.time = 0;
 			}
 
@@ -155,6 +177,7 @@ class Leg{
 		}
 
 		if(this.transitioning){
+			
 			this.transition();
 		}
 		this.prevAngle = [this.rootAngle,this.jointAngle];
@@ -180,7 +203,7 @@ function findEnds(root, angle, length){
 function setup(){
 	frameRate(fps);
 	createCanvas(500,500);
-	creature = new Body(numlegs);
+	creature = new Body(numlegs); 
 	
 }
 
