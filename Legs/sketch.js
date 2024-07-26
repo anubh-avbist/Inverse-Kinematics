@@ -2,8 +2,11 @@ const segmentLength = 50;
 const numlegs = 5;
 const fps = 60;
 const maxSpeed = 0.5;
-const acceleration = 0.35;
+const acceleration = 0.1;
 const wobble = 0.1;
+const canvasSize = 600;
+const gravity = 5;
+const fallThreshold = 0.9;
 let floorLevel = 400;
 let creature;
 let time = 0;
@@ -12,7 +15,7 @@ let edges = [];
 
 function setup(){
 	frameRate(fps);
-	createCanvas(500,500);
+	createCanvas(canvasSize,canvasSize);
 	creature = new Body(numlegs); 
 	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel-50], [250,250]));
 	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
@@ -62,8 +65,8 @@ function bezierInterpolation(start, end, root, t){
 
 function Newton(f, fPrime, x, root){
 	
-	return x + (f(x, root)/fPrime(x, root));
-}
+	return Math.min(Math.max(x + (f(x, root)/fPrime(x, root)), 0),1);
+} 
 
 
 
@@ -109,16 +112,10 @@ class Edge{
 		let start = this.start;
 		let end = this.end;
 		let nodes = this.nodes;
-		if(this.type === "linear"){
-			return function(t,r){
-				let x = r[0];
-				let y = r[1];
-				
-				let firstTerm = Math.pow((start[0]*(1-t) + end[0]*t-x),2);
-				let secondTerm = Math.pow((start[1]*(1-t) + end[1]*t-y),2);
-				return Math.sqrt(firstTerm+secondTerm);
-			};
-		}
+		let fun = this.fun;
+		return function(t,r){
+			return getMagnitude(subVector2(r, fun(t)));
+		};
 	}
 
 	get distancePrime(){
@@ -134,6 +131,9 @@ class Edge{
 				let denominator = distanceFun(t,r);
 				return (firstTerm*(start[0]-end[0]) + secondTerm*(start[1]-end[1]))/denominator;
 			};
+		}
+		if(this.type === "bezier"){ // WORK HERE
+
 		}
 	}
 
@@ -181,7 +181,6 @@ class Leg{
 		this.destination = dest;
 		this.legSize = segmentLength; //-5+Math.random()*10;
 		this.jointPos = [1,1];
-		this.footPos = [0,0];
 		this.prevAngle = [0,0]; // [0] is root, [1] is joint;
 		this.time = 0;
 		this.anchored = false;
@@ -189,7 +188,7 @@ class Leg{
 		this.orientation = 0;
 		this.transitioning = false;
 		this.stepHeight = 5;
-		this.transTime = 0.38;
+		this.transTime = 0.4;
 		this.startDestination = [0,0];
 		this.tVal = 0.5;
 	}
@@ -199,9 +198,9 @@ class Leg{
 		fill(0,0,255);
 		ellipse(this.destination[0],this.destination[1],10,10);
 		fill(255);
-		//ellipse(this.jointPos[0],this.jointPos[1],10,10);
+		ellipse(this.newDestination[0],this.newDestination[1],10,10);
 		fill(255,0,255);
-		//ellipse(this.footPos[0],this.footPos[1],10,10);
+		
 		strokeWeight(5);
 	}
 
@@ -211,10 +210,8 @@ class Leg{
 		if(this.time < this.transTime){
 			let t = this.time/this.transTime;
 			this.destination = bezierInterpolation(this.startDestination,this.newDestination,this.root,t);
-			// If this destination is away again cuz you were moving, re-pick a new destination.
+			// If this destination is away again cuz you wersde moving, re-pick a new destination.
 
-		} else {
-			this.transitioning = false;
 		}
 
 	}
@@ -227,7 +224,7 @@ class Leg{
 				let i = 0;
 				let tVal = this.tVal;
 				let foundValue = false;
-				while(i<10){
+				while(i<30){
 
 					if(edge.distanceFun(tVal,this.root) <= this.legSize*2){
 						foundValue = true;
@@ -252,12 +249,7 @@ class Leg{
 			let rand = Math.floor(Math.random()*possibleDestinations.length);
 			this.newDestination = possibleDestinations[rand];
 
-		} else {
-			
 		}
-		
-		//this.newDestination[0] = this.root[0]+(this.root[0]-this.destination[0])*(Math.random()*0.75+0.25);
-		//this.newDestination[1] = floorLevel-this.newDestination[0]/500*50;
 	}
 
 	IK(){
@@ -265,21 +257,11 @@ class Leg{
 			this.root[0] + this.legSize*Math.cos(this.rootAngle), 
 			this.root[1] + this.legSize*Math.sin(this.rootAngle)
 		];
-		this.footPos = [
-			this.jointPos[0] + this.legSize*Math.cos(this.jointAngle), 
-			this.jointPos[1] + this.legSize*Math.sin(this.jointAngle)
-		];
-
+		
 		 
 		let dist = vector2Distance(this.destination,this.root);
 		
-		this.footPos[0] = lerp(this.footPos[0], this.destination[0], 0.5);
-		this.footPos[1] = lerp(this.footPos[1], this.destination[1], 0.5);
-		if(getMagnitude(subVector2(this.footPos,this.jointPos))>this.legSize){
-			let scaleFactor = 1;
-			this.footPos[0]*=scaleFactor;
-			this.footPos[1]*=scaleFactor;
-		}
+		
 		let refAngle = getAngle([1,0],subVector2(this.destination,this.root));
 		if(this.destination[1]<this.root[1] ){
 			refAngle*=-1;
@@ -304,11 +286,12 @@ class Leg{
 
 			this.rootAngle = solutions[this.orientation][0];
 			this.jointAngle = solutions[this.orientation][1];
-			this.footPos = lerp(this.footPos,this.destination,0.5);
+			
 			
 		} else { // If out out range, straigthen out the leg.
-			if(this.anchored || dist > this.legSize*3 && !this.transitioning){ // Transition Anchor
+			if(this.anchored || dist > this.legSize*2 && !this.transitioning){ // Transition Anchor
 
+				console.log(time);
 				// Set Up Transitioning
 				this.transitioning = true;
 				
@@ -317,17 +300,16 @@ class Leg{
 				this.pickDestination();
 				this.startDestination = this.destination;
 				this.time = 0;
+				this.anchored = false; 
 			}
 
-			
-			this.anchored = false; 
-			//console.log(Math.abs(this.rootAngle-refAngle));
 			if(Math.abs(this.rootAngle-refAngle)>1){
 				this.rootAngle = refAngle;
 				this.jointAngle = refAngle;
 			}
 			this.rootAngle = lerp(this.rootAngle,refAngle,0.5);
 			this.jointAngle = lerp(this.jointAngle ,refAngle,0.5);
+			
 		}
 
 		if(this.transitioning){
@@ -352,8 +334,10 @@ class Body{
 	}
 
 	update(deltaTime){
-		this.vel[0] += this.acc[0];
-		this.vel[1] += this.acc[1];
+
+		//let fallOffset = this.getAverageExtension()>fallThreshold ? gravity*2*(this.getAverageExtension()-fallThreshold) : 0;
+		this.vel[0] += this.acc[0]; 
+		this.vel[1] += this.acc[1];//+ fallOffset;
 
 		if(getMagnitude(this.vel)>maxSpeed){
 			let scale = maxSpeed/getMagnitude(this.vel);
@@ -363,6 +347,16 @@ class Body{
 
 		this.x += this.vel[0]*deltaTime;
 		this.y += this.vel[1]*deltaTime;
+	}
+
+	getAverageExtension(){
+		let dist = 0;
+		let num = 0;
+		this.legs.forEach((leg) => {
+			num++;
+			dist += getMagnitude(subVector2([this.x,this.y],leg.destination))/(2*leg.legSize);
+		});
+		return dist/num;
 	}
 }
 
@@ -392,8 +386,6 @@ function draw(){
 	}
 
 
-	//creature.x=lerp(creature.x,mouseX, 0.5);
-	//creature.y=lerp(creature.y,mouseY,0.5);
 	creature.update(deltaTime);
 
 	// Draw floor
@@ -437,6 +429,7 @@ function draw(){
 		);
 		endShape();
 	}
+	
 }
 
 
