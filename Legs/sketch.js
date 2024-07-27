@@ -1,12 +1,13 @@
 const segmentLength = 50;
 const numlegs = 5;
 const fps = 60;
-const maxSpeed = 0.3;
+const maxSpeed = 0.25;
 const acceleration = 0.1;
-const wobble = 0.1;
+const wobble = 1;
 const canvasSize = 600;
 const gravity = 5;
-const fallThreshold = 0.9;
+const fallThreshold = 300;
+const transTime = 0.35;
 let floorLevel = 400;
 let creature;
 let time = 0;
@@ -17,8 +18,8 @@ function setup(){
 	frameRate(fps);
 	createCanvas(canvasSize,canvasSize);
 	creature = new Body(numlegs); 
-	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel-50], [250,250]));
 	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
+	edges.push(new Edge("linear", [0,500], [500,500], [250,250]));
 	edges.push(new Edge("linear", [0,floorLevel], [400,0], [250,250]));
 	edges.push(new Edge("linear", [400,floorLevel], [400,0], [250,250]));
 	//edges.push(new Edge("bezier", [0,0],[500,floorLevel],[[0,200],[250,200]]));
@@ -33,7 +34,8 @@ function getMagnitude(a){
 }
 
 function vector2Distance(a,b){
-	return Math.sqrt(Math.pow((a[0]-b[0]),2)+Math.pow((a[1]-b[1]),2));
+	return getMagnitude(subVector2(a,b));
+	
 }
 
 function getAngle(a,b){
@@ -114,7 +116,8 @@ class Edge{
 		let nodes = this.nodes;
 		let fun = this.fun;
 		return function(t,r){
-			return getMagnitude(subVector2(r, fun(t)));
+			return vector2Distance(r,fun(t));
+			
 		};
 	}
 
@@ -188,7 +191,7 @@ class Leg{
 		this.orientation = 0;
 		this.transitioning = false;
 		this.stepHeight = 5;
-		this.transTime = 0.4;
+		this.transTime = transTime;
 		this.startDestination = [0,0];
 		this.tVal = 0.5;
 	}
@@ -205,7 +208,7 @@ class Leg{
 	}
 
 	transition(){
-		this.time += 1/fps;	
+		//this.time += 1/fps;	
 		
 		if(this.time < this.transTime){
 			let t = this.time/this.transTime;
@@ -257,6 +260,7 @@ class Leg{
 	}
 
 	IK(){
+		this.time += 1/fps;	
 		this.jointPos = [
 			this.root[0] + this.legSize*Math.cos(this.rootAngle), 
 			this.root[1] + this.legSize*Math.sin(this.rootAngle)
@@ -273,7 +277,6 @@ class Leg{
 
 
 		if(dist <= this.legSize*2){ // If in range
-			
 			if(!this.anchored){ // randomize counter vs clock wise
 				this.orientation = Math.round(Math.random());
 			}
@@ -292,10 +295,11 @@ class Leg{
 			this.jointAngle = solutions[this.orientation][1];
 			
 			
+			
 		} else { // If out out range, straigthen out the leg.
-			if(this.anchored || dist > this.legSize*2 && !this.transitioning){ // Transition Anchor
+			
+			if(this.anchored || vector2Distance(this.newDestination,this.destination) > this.legSize && !this.transitioning){ // Transition Anchor
 
-				console.log(time);
 				// Set Up Transitioning
 				this.transitioning = true;
 				
@@ -306,14 +310,6 @@ class Leg{
 				this.time = 0;
 				this.anchored = false; 
 			}
-
-			if(Math.abs(this.rootAngle-refAngle)>1){
-				this.rootAngle = refAngle;
-				this.jointAngle = refAngle;
-			}
-			this.rootAngle = lerp(this.rootAngle,refAngle,0.5);
-			this.jointAngle = lerp(this.jointAngle ,refAngle,0.5);
-			
 		}
 
 		if(this.transitioning){
@@ -339,9 +335,8 @@ class Body{
 
 	update(deltaTime){
 
-		//let fallOffset = this.getAverageExtension()>fallThreshold ? gravity*2*(this.getAverageExtension()-fallThreshold) : 0;
 		this.vel[0] += this.acc[0]; 
-		this.vel[1] += this.acc[1];//+ fallOffset;
+		this.vel[1] += this.acc[1];
 
 		if(getMagnitude(this.vel)>maxSpeed){
 			let scale = maxSpeed/getMagnitude(this.vel);
@@ -361,6 +356,16 @@ class Body{
 			dist += getMagnitude(subVector2([this.x,this.y],leg.destination))/(2*leg.legSize);
 		});
 		return dist/num;
+	}
+
+	getAverageDist(){
+		let dist = 0;
+		let num = 0;
+		this.legs.forEach((leg) => {
+			num++;
+			dist += vector2Distance(leg.newDestination,leg.destination);
+		});
+		return dist;
 	}
 }
 
@@ -410,7 +415,7 @@ function draw(){
 
 	// Body
 	stroke(50,200,200);
-	ellipse(creature.x,creature.y,50,50);
+	ellipse(creature.x + wobble/5 * (Math.random()*2-1),creature.y+ wobble/5 * (Math.random()*2-1)+Math.sin(Math.PI*time+Math.random())*2,50,50);
 
 	// For Each Leg
 	for(let i = 0; i < creature.legs.length; i++){
@@ -424,15 +429,17 @@ function draw(){
 		noFill();
 		vertex(creature.x,creature.y);
 		bezierVertex(
-			findEnds(leg.root,leg.rootAngle,leg.legSize)[0],
-			findEnds(leg.root,leg.rootAngle,leg.legSize)[1], 
-			findEnds(leg.root,leg.rootAngle,leg.legSize)[0],
-			findEnds(leg.root,leg.rootAngle,leg.legSize)[1],
+			findEnds(leg.root,leg.rootAngle,leg.legSize)[0] +wobble*(Math.random()*2-1),
+			findEnds(leg.root,leg.rootAngle,leg.legSize)[1] +wobble*(Math.random()*2-1), 
+			findEnds(leg.root,leg.rootAngle,leg.legSize)[0] +wobble*(Math.random()*2-1),
+			findEnds(leg.root,leg.rootAngle,leg.legSize)[1] +wobble*(Math.random()*2-1),
 			findEnds(findEnds(leg.root,leg.rootAngle,leg.legSize), leg.jointAngle, leg.legSize)[0],
 			findEnds(findEnds(leg.root,leg.rootAngle,leg.legSize), leg.jointAngle, leg.legSize)[1]
 		);
 		endShape();
 	}
+	
+	console.log(creature.getAverageDist());
 	
 }
 
