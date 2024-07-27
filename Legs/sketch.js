@@ -1,7 +1,7 @@
 const segmentLength = 50;
 const numlegs = 5;
 const fps = 60;
-const maxSpeed = 0.5;
+const maxSpeed = 0.3;
 const acceleration = 0.1;
 const wobble = 0.1;
 const canvasSize = 600;
@@ -211,7 +211,11 @@ class Leg{
 			let t = this.time/this.transTime;
 			this.destination = bezierInterpolation(this.startDestination,this.newDestination,this.root,t);
 			// If this destination is away again cuz you wersde moving, re-pick a new destination.
-
+			if(getMagnitude(subVector2(this.root,this.newDestination))>this.legSize*2){
+				this.pickDestination();
+				this.startDestination = this.destination;
+				this.time=0;
+			}
 		}
 
 	}
