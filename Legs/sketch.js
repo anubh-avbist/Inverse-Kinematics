@@ -4,7 +4,7 @@ const fps = 60;
 const maxSpeed = 0.25;
 const acceleration = 0.1;
 const wobble = 0;
-const canvasSize = 600;
+const canvasSize = 800;
 const gravity = 5;
 const fallThreshold = 300;
 const transTime = 0.3;
@@ -18,19 +18,15 @@ function setup(){
 	frameRate(fps);
 	createCanvas(canvasSize,canvasSize);
 	creature = new Body(numlegs); 
-	//edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
-	//edges.push(new Edge("linear", [0,500], [500,500], [250,250]));
-	//edges.push(new Edge("linear", [0,floorLevel], [400,0], [250,250]));
-	//edges.push(new Edge("linear", [400,floorLevel], [400,0], [250,250]));
+	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
+	edges.push(new Edge("linear", [0,500], [500,500], [250,250]));
+	edges.push(new Edge("linear", [0,floorLevel], [400,0], [250,250]));
+	edges.push(new Edge("linear", [400,floorLevel], [400,0], [250,250]));
 	edges.push(new Edge("bezier", [0,0],[500,floorLevel],[[300,0],[0,500]]));
-	
-	
-	//console.log(edges[0].fun(0.5));
-	
+	edges.push(new Edge("bezier", [500,floorLevel],[400,30],[[1000,300],[500,0]]));	
 }
 
 // Math
-
 function getMagnitude(a){
 	return Math.sqrt(Math.pow(a[0],2)+Math.pow(a[1],2));
 }
@@ -60,18 +56,14 @@ function scalarMultiply(scalar, v){
 }
 
 function bezierInterpolation(start, end, root, t){ 
-	
 	let x = Math.pow((1-t),2)*start[0] + 2*(1-t)*t*root[0]+t*t*end[0];
 	let y = Math.pow((1-t),2)*start[1] + 2*(1-t)*t*root[1]+t*t*end[1];
 	return[x,y];
-
 }
 
 function Newton(f, fPrime, x, root){
 	return Math.min(Math.max(x + (f(x, root)/fPrime(x, root)), 0),1);
 } 
-
-
 
 // Classes
 
@@ -103,7 +95,6 @@ class Edge{
 					let thirdTerm = scalarMultiply(3*(1-t)*Math.pow(t,2),nodes[1]);
 					let fourthTerm = scalarMultiply(Math.pow(t,3),end);
 					output = (addVector2(addVector2(addVector2(firstTerm,secondTerm),thirdTerm),fourthTerm));
-					
 				}
 				return output;
 			};
@@ -131,7 +122,6 @@ class Edge{
 				return output;
 			};
 		}
-		
 	}
 	
 	get distanceFun(){
@@ -143,7 +133,6 @@ class Edge{
 	}
 
 	get distancePrime(){
-		
 		let start = this.start;
 		let end = this.end;
 		let nodes = this.nodes; 
@@ -160,7 +149,6 @@ class Edge{
 		}
 		if(this.type === "bezier"){ // WORK HERE
 			return function(t,r){ 
-				
 				let firstTerm = fun(t)[0]*funPrime(t)[0]-funPrime(t)[0]*r[0];
 				let secondTerm = fun(t)[1]*funPrime(t)[1]-funPrime(t)[1]*r[1];
 				return (firstTerm+secondTerm)/distanceFun(t,r);
@@ -169,10 +157,8 @@ class Edge{
 	}
 
 	drawEdge(){
-		
 		stroke(255,0,255);
 		if(this.type === "bezier"){
-			
 			beginShape();
 			noFill();
 			vertex(this.start[0],this.start[1]);
@@ -184,14 +170,10 @@ class Edge{
 				this.end[0],
 				this.end[1]
 			);
-
-	
 			endShape();
-
 		} else if(this.type === "linear"){
 			strokeWeight(5);
 			line(this.start[0],this.start[1],this.end[0],this.end[1]);
-
 		}
 	}
 	
@@ -205,24 +187,19 @@ class Platform{
 
 class Leg{
 	constructor(root, dest){
-
 		// Only 3 things needed to draw the leg
 		this.root = root;
 		this.rootAngle = Math.PI/2;
 		this.jointAngle = 0;
 		this.destination = dest;
 		this.legSize = segmentLength; //-5+Math.random()*10;
-		this.jointPos = [1,1];
-		this.prevAngle = [0,0]; // [0] is root, [1] is joint;
 		this.time = 0;
 		this.anchored = false;
 		this.newDestination = [0,0];
 		this.orientation = 0;
 		this.transitioning = false;
-		this.stepHeight = 5;
 		this.transTime = transTime;
 		this.startDestination = [0,0];
-		this.tVal = 0.5;
 	}
 
 	debugStuff(){
@@ -232,7 +209,6 @@ class Leg{
 		fill(255);
 		ellipse(this.newDestination[0],this.newDestination[1],10,10);
 		fill(255,0,255);
-		
 		strokeWeight(5);
 	}
 
@@ -253,8 +229,7 @@ class Leg{
 	pickDestination(){ 
 		let possibleTs = [];
 		let possibleDestinations = [];
-		edges.forEach(edge => {
-			
+		edges.forEach(edge => {	
 			let i = 0;
 			let tVal = Math.random();
 			let foundValue = false;
@@ -265,45 +240,29 @@ class Leg{
 					break;
 				} else {
 					i++;
-					
 					tVal = Newton(edge.distanceFun, edge.distancePrime, tVal, this.root)+ (Math.random()*2-1)*0.05;
 				}
 			}   
 			if(foundValue){ 
 				possibleTs.push(tVal);
 				possibleDestinations.push(edge.fun(tVal));	
-				this.tVal = tVal;
-			} else {
-				
 			}
-			
 			
 		});
 		
 		if(possibleDestinations.length>0){
-			
 			let rand = Math.floor(Math.random()*possibleDestinations.length);
 			this.newDestination = possibleDestinations[rand];
-
 		}
 	}
 
 	IK(){
 		this.time += 1/fps;	
-		this.jointPos = [
-			this.root[0] + this.legSize*Math.cos(this.rootAngle), 
-			this.root[1] + this.legSize*Math.sin(this.rootAngle)
-		];
-		
-		 
 		let dist = vector2Distance(this.destination,this.root);
-		
-		
 		let refAngle = getAngle([1,0],subVector2(this.destination,this.root));
 		if(this.destination[1]<this.root[1] ){
 			refAngle*=-1;
 		}
-
 
 		if(dist <= this.legSize*2){ // If in range
 			if(!this.anchored){ // randomize counter vs clock wise
@@ -331,9 +290,7 @@ class Leg{
 
 				// Set Up Transitioning
 				this.transitioning = true;
-				
 				this.startDestination = this.destination;
-
 				this.pickDestination();
 				this.startDestination = this.destination;
 				this.time = 0;
@@ -342,10 +299,9 @@ class Leg{
 		}
 
 		if(this.transitioning){
-			
 			this.transition();
 		}
-		this.prevAngle = [this.rootAngle,this.jointAngle];
+		
 	}
 }
 
@@ -429,17 +385,6 @@ function draw(){
 
 	creature.update(deltaTime);
 
-	// Draw floor
-
-	fill(255);
-	noStroke();
-	
-	noFill();
-	
-	strokeWeight(5);
-	stroke(50,200,200);
-
-
 	// Draw edges
 	edges.forEach((edge) => {
 		edge.drawEdge();
@@ -452,11 +397,10 @@ function draw(){
 
 	// For Each Leg
 	for(let i = 0; i < creature.legs.length; i++){
-
 		let leg = creature.legs[i];
 		leg.root = [creature.x,creature.y];
 		leg.IK();
-		leg.debugStuff(); 
+		//leg.debugStuff(); 
 		
 		beginShape();
 		noFill();
@@ -471,9 +415,6 @@ function draw(){
 		);
 		endShape();
 	}
-	
-	
-	
 }
 
 
