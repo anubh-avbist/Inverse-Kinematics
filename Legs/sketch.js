@@ -1,13 +1,13 @@
 const segmentLength = 50;
-const numlegs = 5;
+const numlegs = 6;
 const fps = 60;
 const maxSpeed = 0.25;
 const acceleration = 0.1;
-const wobble = 1;
+const wobble = 0;
 const canvasSize = 600;
 const gravity = 5;
 const fallThreshold = 300;
-const transTime = 0.35;
+const transTime = 0.3;
 let floorLevel = 400;
 let creature;
 let time = 0;
@@ -18,12 +18,14 @@ function setup(){
 	frameRate(fps);
 	createCanvas(canvasSize,canvasSize);
 	creature = new Body(numlegs); 
-	edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
-	edges.push(new Edge("linear", [0,500], [500,500], [250,250]));
-	edges.push(new Edge("linear", [0,floorLevel], [400,0], [250,250]));
-	edges.push(new Edge("linear", [400,floorLevel], [400,0], [250,250]));
-	//edges.push(new Edge("bezier", [0,0],[500,floorLevel],[[0,200],[250,200]]));
+	//edges.push(new Edge("linear", [0,floorLevel], [500,floorLevel], [250,250]));
+	//edges.push(new Edge("linear", [0,500], [500,500], [250,250]));
+	//edges.push(new Edge("linear", [0,floorLevel], [400,0], [250,250]));
+	//edges.push(new Edge("linear", [400,floorLevel], [400,0], [250,250]));
+	edges.push(new Edge("bezier", [0,0],[500,floorLevel],[[300,0],[0,500]]));
 	
+	
+	//console.log(edges[0].fun(0.5));
 	
 }
 
@@ -66,7 +68,6 @@ function bezierInterpolation(start, end, root, t){
 }
 
 function Newton(f, fPrime, x, root){
-	
 	return Math.min(Math.max(x + (f(x, root)/fPrime(x, root)), 0),1);
 } 
 
@@ -93,27 +94,47 @@ class Edge{
 			return function(t){
 				return [lerp(start[0],end[0],t), lerp(start[1],end[1],t)];
 			};
-		} else if(this.type==="bezier"){
+		} else if(this.type==="bezier"){ 
 			return function(t){
-				let output = [];
+				let output = []; 
 				for(let i = 0; i < 2; i++){
+					let firstTerm = scalarMultiply(Math.pow((1-t),3),start);
+					let secondTerm = scalarMultiply(3*t*Math.pow((1-t),2),nodes[0]);
+					let thirdTerm = scalarMultiply(3*(1-t)*Math.pow(t,2),nodes[1]);
+					let fourthTerm = scalarMultiply(Math.pow(t,3),end);
+					output = (addVector2(addVector2(addVector2(firstTerm,secondTerm),thirdTerm),fourthTerm));
 					
-					let firstTerm = scalarMultiply(Math.pow((1-t),3),nodes[i]);
-					let secondTerm = scalarMultiply(t*Math.pow((1-t),2),nodes[i]);
-					let thirdTerm = scalarMultiply((1-t)*Math.pow(t,2),nodes[i]);
-					let fourthTerm = scalarMultiply(Math.pow(t,3),nodes[i]);
-					output.push(addVector2(addVector2(addVector2(firstTerm,secondTerm),thirdTerm),fourthTerm));
 				}
 				return output;
 			};
 		}
 	}
-	
-	get distanceFun(){
+
+	get funPrime(){
 		
 		let start = this.start;
 		let end = this.end;
 		let nodes = this.nodes;
+		if(this.type === "linear"){
+			return [(end[1]-start[1])/end[0]-start[0],1];
+		}
+		if(this.type === "bezier"){
+			return function(t){
+				let output = [];
+				for(let i = 0; i < 2; i++){
+					let firstTerm = -3*Math.pow(1-t,2)*start[i];
+					let secondTerm = 6*(Math.pow(1-t,2)-2*(1-t)*t)*nodes[0][i];
+					let thirdTerm = 6*(2*t*(1-t)-Math.pow(t,2))*nodes[1][i];
+					let fourthTerm = 3*Math.pow(t,2)*end[i];
+					output.push(firstTerm+secondTerm+thirdTerm+fourthTerm);
+				}
+				return output;
+			};
+		}
+		
+	}
+	
+	get distanceFun(){
 		let fun = this.fun;
 		return function(t,r){
 			return vector2Distance(r,fun(t));
@@ -126,6 +147,8 @@ class Edge{
 		let start = this.start;
 		let end = this.end;
 		let nodes = this.nodes; 
+		let fun = this.fun;
+		let funPrime = this.funPrime;
 		let distanceFun = this.distanceFun;
 		if(this.type === "linear"){
 			return function(t,r){ 
@@ -136,11 +159,18 @@ class Edge{
 			};
 		}
 		if(this.type === "bezier"){ // WORK HERE
-
+			return function(t,r){ 
+				
+				let firstTerm = fun(t)[0]*funPrime(t)[0]-funPrime(t)[0]*r[0];
+				let secondTerm = fun(t)[1]*funPrime(t)[1]-funPrime(t)[1]*r[1];
+				return (firstTerm+secondTerm)/distanceFun(t,r);
+			};
 		}
 	}
 
 	drawEdge(){
+		
+		stroke(255,0,255);
 		if(this.type === "bezier"){
 			
 			beginShape();
@@ -159,7 +189,6 @@ class Edge{
 			endShape();
 
 		} else if(this.type === "linear"){
-			stroke(255,0,255);
 			strokeWeight(5);
 			line(this.start[0],this.start[1],this.end[0],this.end[1]);
 
@@ -208,8 +237,6 @@ class Leg{
 	}
 
 	transition(){
-		//this.time += 1/fps;	
-		
 		if(this.time < this.transTime){
 			let t = this.time/this.transTime;
 			this.destination = bezierInterpolation(this.startDestination,this.newDestination,this.root,t);
@@ -227,27 +254,29 @@ class Leg{
 		let possibleTs = [];
 		let possibleDestinations = [];
 		edges.forEach(edge => {
-			if(edge.type === "linear"){
-				let i = 0;
-				let tVal = this.tVal;
-				let foundValue = false;
-				while(i<30){
+			
+			let i = 0;
+			let tVal = Math.random();
+			let foundValue = false;
+			while(i<30){
 
-					if(edge.distanceFun(tVal,this.root) <= this.legSize*2){
-						foundValue = true;
-						break;
-					} else {
-						i++;
-						
-						tVal = Newton(edge.distanceFun, edge.distancePrime, tVal, this.root)+ (Math.random()*2-1)*0.05;
-					}
+				if(edge.distanceFun(tVal,this.root) <= this.legSize*2){
+					foundValue = true;
+					break;
+				} else {
+					i++;
+					
+					tVal = Newton(edge.distanceFun, edge.distancePrime, tVal, this.root)+ (Math.random()*2-1)*0.05;
 				}
-				if(foundValue){ 
-					possibleTs.push(tVal);
-					possibleDestinations.push(edge.fun(tVal));	
-					this.tVal = tVal;
-				} 
+			}   
+			if(foundValue){ 
+				possibleTs.push(tVal);
+				possibleDestinations.push(edge.fun(tVal));	
+				this.tVal = tVal;
+			} else {
+				
 			}
+			
 			
 		});
 		
@@ -323,8 +352,8 @@ class Leg{
 
 class Body{
 	constructor(numLegs){
-		this.x = 0;
-		this.y = 0;
+		this.x = 250;
+		this.y = 250;
 		this.legs = [];
 		this.vel = [0,0];
 		this.acc = [0,0]; 
@@ -375,6 +404,9 @@ function findEnds(root, angle, length){
 
 function draw(){
 	time+=1/fps;
+	if(time > 1000*Math.PI){
+		time = 0;
+	}
 	background(51);
 	creature.acc = [0,0];
 	if(pressedKeys.a){
@@ -414,8 +446,9 @@ function draw(){
 	});
 
 	// Body
+	let offset = 3*Math.sin(Math.PI*time);
 	stroke(50,200,200);
-	ellipse(creature.x + wobble/5 * (Math.random()*2-1),creature.y+ wobble/5 * (Math.random()*2-1)+Math.sin(Math.PI*time+Math.random())*2,50,50);
+	ellipse(creature.x,creature.y+offset,50,50);
 
 	// For Each Leg
 	for(let i = 0; i < creature.legs.length; i++){
@@ -423,11 +456,11 @@ function draw(){
 		let leg = creature.legs[i];
 		leg.root = [creature.x,creature.y];
 		leg.IK();
-		//leg.debugStuff();
+		leg.debugStuff(); 
 		
 		beginShape();
 		noFill();
-		vertex(creature.x,creature.y);
+		vertex(creature.x,creature.y+offset);
 		bezierVertex(
 			findEnds(leg.root,leg.rootAngle,leg.legSize)[0] +wobble*(Math.random()*2-1),
 			findEnds(leg.root,leg.rootAngle,leg.legSize)[1] +wobble*(Math.random()*2-1), 
@@ -439,7 +472,7 @@ function draw(){
 		endShape();
 	}
 	
-	console.log(creature.getAverageDist());
+	
 	
 }
 
