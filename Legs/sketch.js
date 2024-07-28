@@ -1,5 +1,5 @@
 const segmentLength = 50;
-const numlegs = 6;
+const numLegs = 6;
 const fps = 60;
 const maxSpeed = 0.25;
 const acceleration = 0.1;
@@ -17,7 +17,7 @@ let edges = [];
 function setup() {
 	frameRate(fps);
 	createCanvas(canvasSize, canvasSize);
-	creature = new Body(numlegs);
+	creature = new Body(numLegs);
 	edges.push(new Edge("linear", [0, floorLevel], [500, floorLevel], [250, 250]));
 	edges.push(new Edge("linear", [0, 500], [500, 500], [250, 250]));
 	edges.push(new Edge("linear", [0, floorLevel], [400, 0], [250, 250]));
@@ -33,7 +33,6 @@ function getMagnitude(a) {
 
 function vector2Distance(a, b) {
 	return getMagnitude(subVector2(a, b));
-
 }
 
 function getAngle(a, b) {
