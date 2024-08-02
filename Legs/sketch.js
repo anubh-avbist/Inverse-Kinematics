@@ -8,7 +8,7 @@ const canvasSize = 800;
 const gravity = 5;
 const fallThreshold = 300;
 const transTime = 0.3;
-let floorLevel = 400;
+let floorLevel = 400; 
 let creature;
 let time = 0;
 let pressedKeys = {};
@@ -366,6 +366,9 @@ function draw() {
 		creature.vel[0] = lerp(creature.vel[0], 0, 0.3);
 		creature.vel[1] = lerp(creature.vel[1], 0, 0.3);
 	}
+
+	creature.x = lerp(creature.x, mouseX, 0.05);
+	creature.y = lerp(creature.y, mouseY, 0.05);
 
 	creature.update(deltaTime);
 
