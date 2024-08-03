@@ -7,7 +7,7 @@ const wobble = 0;
 const canvasSize = 800;
 const gravity = 5;
 const fallThreshold = 300;
-const transTime = 0.3;
+const transTime = 0.35;
 let floorLevel = 400; 
 let creature;
 let time = 0;
@@ -65,8 +65,6 @@ function bezierInterpolation(start, end, root, t) {
 function Newton(f, fPrime, x, root) {
 	return Math.min(Math.max(x + (f(x, root) / fPrime(x, root)), 0), 1);
 }
-
-// Classes
 
 class Edge {
 	constructor(type, start, end, nodes) {
@@ -168,12 +166,6 @@ class Edge {
 			strokeWeight(5);
 			line(this.start[0], this.start[1], this.end[0], this.end[1]);
 		}
-	}
-}
-
-class Platform {
-	constructor() {
-		this.edges = [];
 	}
 }
 
@@ -386,8 +378,6 @@ function draw() {
 	for (let leg of creature.legs) {
 		leg.root = [creature.x, creature.y];
 		leg.IK();
-		//leg.debugStuff();
-
 		beginShape();
 		noFill();
 		vertex(creature.x, creature.y + offset);
