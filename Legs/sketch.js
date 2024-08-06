@@ -255,9 +255,6 @@ class Leg {
 			let theta = Math.PI - Math.acos((dist * dist - 2 * (this.legSize * this.legSize)) / (2 * this.legSize * this.legSize));
 			let phi = (Math.PI - theta) / 2;
 
-			this.rootAngle = lerp(this.rootAngle, refAngle - phi, 1);
-			this.jointAngle = lerp(this.jointAngle, this.rootAngle + Math.PI - theta, 1);
-
 			let firstSol = [refAngle - phi, refAngle - phi + Math.PI - theta];
 			let secondSol = [refAngle + phi, refAngle + phi - Math.PI + theta];
 			let solutions = [firstSol, secondSol];
