@@ -133,7 +133,6 @@ class Edge {
 	get distancePrime() {
 		let start = this.start;
 		let end = this.end;
-		let nodes = this.nodes;
 		let fun = this.fun;
 		let funPrime = this.funPrime;
 		let distanceFun = this.distanceFun;
@@ -267,7 +266,6 @@ class Leg {
 				this.transitioning = true;
 				this.startDestination = this.destination;
 				this.pickDestination();
-				this.startDestination = this.destination;
 				this.time = 0;
 				this.anchored = false;
 			}
