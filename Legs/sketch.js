@@ -373,6 +373,7 @@ function draw() {
 	for (let leg of creature.legs) {
 		leg.root = [creature.x, creature.y];
 		leg.IK();
+		leg.debugStuff();
 		beginShape();
 		noFill();
 		vertex(creature.x, creature.y + offset);
